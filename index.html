@@ -22,6 +22,8 @@
 <body>
     <script>
         let scene, camera, renderer, sol, planetas, estrellasMaterial;
+        let raycaster = new THREE.Raycaster();
+        let mouse = new THREE.Vector2();
 
         function init() {
             scene = new THREE.Scene();
@@ -61,6 +63,7 @@
                 let material = new THREE.MeshPhongMaterial({ color: datos.color });
                 let geometria = new THREE.SphereGeometry(datos.tamaño, 32, 32);
                 let planeta = new THREE.Mesh(geometria, material);
+                planeta.name = datos.nombre; // Asignar el nombre al planeta
 
                 let planetaGroup = new THREE.Group();
                 planetaGroup.position.set(datos.distancia, 0, 0);
@@ -135,11 +138,24 @@
             let estrellas = new THREE.Points(estrellasGeometry, estrellasMaterial);
             scene.add(estrellas);
 
-
             animate();
         }
 
         let tiempo = 0;
+
+        let mouseX = 0;
+        let mouseY = 0;
+
+        document.addEventListener('mousemove', function (event) {
+            onMouseMove(event);
+        }, false);
+
+        function onMouseMove(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            mouseX = event.clientX;
+            mouseY = event.clientY;
+        }
 
         function animate() {
             requestAnimationFrame(animate);
@@ -151,6 +167,19 @@
                 planeta.mesh.position.x = planeta.distancia * Math.cos(tiempo * planeta.velocidadOrbita);
                 planeta.mesh.position.z = planeta.distancia * Math.sin(tiempo * planeta.velocidadOrbita);
                 planeta.mesh.rotation.y += 0.01;
+            }
+
+            raycaster.setFromCamera(mouse, camera);
+            let intersects = raycaster.intersectObjects(scene.children, true);
+            if (intersects.length > 0) {
+                let firstIntersection = intersects[0].object;
+                if (firstIntersection.name) {
+                    showTooltip(firstIntersection.name, mouseX, mouseY);
+                } else {
+                    hideTooltip();
+                }
+            } else {
+                hideTooltip();
             }
 
             renderer.render(scene, camera);
@@ -172,6 +201,36 @@
             const linea = new THREE.LineLoop(geometria, material);
             linea.rotation.x = Math.PI / 2; // Rotar 90 grados alrededor del eje X
             return linea;
+        }
+
+        function showTooltip(text, x, y) {
+            let tooltip = document.getElementById("tooltip");
+            if (!tooltip) {
+                tooltip = document.createElement("div");
+                tooltip.id = "tooltip";
+                tooltip.style.position = "absolute";
+                tooltip.style.padding = "6px";
+                tooltip.style.background = "rgba(0,0,0,0.6)";
+                tooltip.style.color = "white";
+                tooltip.style.borderRadius = "4px";
+                tooltip.style.pointerEvents = "none";
+                document.body.appendChild(tooltip);
+            }
+
+            x -= 15;
+            y -= 30;
+
+            tooltip.textContent = text;
+            tooltip.style.left = x + "px";
+            tooltip.style.top = y + "px";
+            tooltip.style.display = "block";
+        }
+
+        function hideTooltip() {
+            let tooltip = document.getElementById("tooltip");
+            if (tooltip) {
+                tooltip.style.display = "none";
+            }
         }
 
         init();
