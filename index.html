@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Three.js Sistema Solar</title>
+    <style>
+        body {
+            margin: 0;
+        }
+
+        canvas {
+            display: block;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"
+        integrity="sha512-334uBDwY0iZ2TklV1OtDtBW9vp7jjP7SWRzT7Ehu1fdtPIjTpCwTSFb8HI/YBau9L1/kRBEOALrS229Kry4yFQ=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+</head>
+
+<body>
+    <script>
+        let scene, camera, renderer, sol, planetas, estrellasMaterial;
+
+        function init() {
+            scene = new THREE.Scene();
+
+            camera = new THREE.PerspectiveCamera(
+                75,
+                window.innerWidth / window.innerHeight,
+                0.1,
+                1000
+            );
+            camera.position.set(0, 50, 150);
+            camera.lookAt(0, 0, 0);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            let solMaterial = new THREE.MeshPhongMaterial({ color: 0xffd700 });
+            let solGeometria = new THREE.SphereGeometry(5, 32, 32);
+            sol = new THREE.Mesh(solGeometria, solMaterial);
+            scene.add(sol);
+
+            planetas = [];
+
+            const datosPlanetas = [
+                { nombre: 'Mercurio', color: 0xaaaaaa, tamaño: 0.88, distancia: 15, velocidadOrbita: 0.20, tieneAnillos: false },
+                { nombre: 'Venus', color: 0xffbf00, tamaño: 0.95, distancia: 22, velocidadOrbita: 0.18 },
+                { nombre: 'Tierra', color: 0x0000ff, tamaño: 1.5, distancia: 30, velocidadOrbita: 0.17 },
+                { nombre: 'Marte', color: 0xff0000, tamaño: 1.13, distancia: 45, velocidadOrbita: 0.15 },
+                { nombre: 'Jupiter', color: 0xffa500, tamaño: 11, distancia: 60, velocidadOrbita: 0.119 },
+                { nombre: 'Saturno', color: 0xffff00, tamaño: 9, distancia: 85, velocidadOrbita: 0.112, tieneAnillos: true },
+                { nombre: 'Urano', color: 0x00ffff, tamaño: 4, distancia: 105, velocidadOrbita: 0.11 },
+                { nombre: 'Neptuno', color: 0x0000aa, tamaño: 3.8, distancia: 125, velocidadOrbita: 0.098 },
+            ];
+
+            for (let datos of datosPlanetas) {
+                let material = new THREE.MeshPhongMaterial({ color: datos.color });
+                let geometria = new THREE.SphereGeometry(datos.tamaño, 32, 32);
+                let planeta = new THREE.Mesh(geometria, material);
+
+                let planetaGroup = new THREE.Group();
+                planetaGroup.position.set(datos.distancia, 0, 0);
+
+                const trayectoria = crearTrayectoria(datos.distancia);
+                scene.add(trayectoria); // Agregar la trayectoria directamente a la escena
+
+                planetaGroup.add(planeta);
+                planetas.push({
+                    mesh: planetaGroup,
+                    distancia: datos.distancia,
+                    velocidadOrbita: datos.velocidadOrbita
+                });
+
+                if (datos.tieneAnillos) {
+                    let anilloMaterial = new THREE.MeshBasicMaterial({ color: 0xaaaaaa, side: THREE.DoubleSide });
+                    let anilloGeometria = new THREE.RingGeometry(datos.tamaño + 1, datos.tamaño + 3, 32, 1);
+                    let anillo = new THREE.Mesh(anilloGeometria, anilloMaterial);
+                    anillo.rotation.x = Math.PI / 2;
+                    planeta.add(anillo);
+                }
+
+                scene.add(planetaGroup);
+            }
+
+            let luzSol = new THREE.PointLight(0xffffff, 1.8);
+            luzSol.position.set(0, 0, 0);
+            scene.add(luzSol);
+
+            let luzAmbiental = new THREE.AmbientLight(0x404040, 0.5);
+            scene.add(luzAmbiental);
+
+            let luzDireccional = new THREE.DirectionalLight(0xffffff, 1);
+            luzDireccional.position.set(0, 2, 1);
+            scene.add(luzDireccional);
+
+            let estrellasGeometry = new THREE.BufferGeometry();
+            let estrellasVertices = [];
+            let estrellasSizes = [];
+            let estrellasOpacities = [];
+
+            for (let i = 0; i < 120000; i++) {
+                let x = (Math.random() - 0.5) * 2000;
+                let y = (Math.random() - 0.5) * 2000;
+                let z = (Math.random() - 0.5) * 2000;
+                estrellasVertices.push(x, y, z);
+
+                // Variar el tamaño entre 0.1 y 0.5
+                estrellasSizes.push(0.4 + Math.random() * 0.5);
+
+                // Variar la opacidad entre 0.5 y 1
+                estrellasOpacities.push(0.5 + Math.random() * 0.5);
+            }
+
+            estrellasGeometry.setAttribute('position', new THREE.Float32BufferAttribute(estrellasVertices, 3));
+            estrellasGeometry.setAttribute('size', new THREE.Float32BufferAttribute(estrellasSizes, 1));
+            estrellasGeometry.setAttribute('opacity', new THREE.Float32BufferAttribute(estrellasOpacities, 1));
+
+            estrellasMaterial = new THREE.PointsMaterial({
+                color: 0xFFFFFF,
+                size: 0.85,
+                map: new THREE.TextureLoader().load("https://threejs.org/examples/textures/sprites/disc.png"),
+                transparent: true,
+                opacity: 0.95,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending, // Hace que las estrellas brillen más
+                vertexColors: false,
+                sizeAttenuation: true, // Las estrellas más cercanas parecerán más grandes
+                alphaTest: 0.5 // Para evitar que las estrellas parcialmente transparentes se rendericen
+            });
+
+            let estrellas = new THREE.Points(estrellasGeometry, estrellasMaterial);
+            scene.add(estrellas);
+
+
+            animate();
+        }
+
+        let tiempo = 0;
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            tiempo += 0.01;
+            sol.rotation.y += 0.005;
+
+            for (let planeta of planetas) {
+                planeta.mesh.position.x = planeta.distancia * Math.cos(tiempo * planeta.velocidadOrbita);
+                planeta.mesh.position.z = planeta.distancia * Math.sin(tiempo * planeta.velocidadOrbita);
+                planeta.mesh.rotation.y += 0.01;
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        function crearTrayectoria(distancia) {
+            const trayectoria = new THREE.EllipseCurve(
+                0, 0,            // ax, aY
+                distancia, distancia, // xRadius, yRadius
+                0, 2 * Math.PI,  // aStartAngle, aEndAngle
+                false,            // aClockwise
+                0                 // aRotation
+            );
+
+            const puntos = trayectoria.getPoints(100);
+            const geometria = new THREE.BufferGeometry().setFromPoints(puntos);
+            const material = new THREE.LineBasicMaterial({ color: 0xAAAAAA });
+
+            const linea = new THREE.LineLoop(geometria, material);
+            linea.rotation.x = Math.PI / 2; // Rotar 90 grados alrededor del eje X
+            return linea;
+        }
+
+        init();
+
+    </script>
+</body>
+
+</html>
